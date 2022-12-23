@@ -5,6 +5,7 @@
 mod internals {
     #[macro_use]
     pub mod rpc;
+    pub mod node;
     pub mod proto;
     pub mod raw_session;
 }
@@ -39,6 +40,8 @@ pub mod config {
 pub mod session;
 /// Types for working with ngrok tunnels.
 pub mod tunnel;
+#[macro_use]
+extern crate napi_derive;
 
 mod tunnel_ext;
 

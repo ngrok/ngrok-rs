@@ -2,3 +2,7 @@
 /Cargo.lock
 .direnv
 *.swp
+.pnp.*
+*.node
+ngrok/node_modules
+ngrok/.yarn/*

@@ -563,6 +563,7 @@ pub struct TlsEndpoint {
     pub hostname: String,
     pub subdomain: String,
     pub proxy_proto: ProxyProto,
+    #[serde(rename = "MutualTLSAtAgent")]
     pub mutual_tls_at_agent: bool,
 
     pub mutual_tls_at_edge: Option<MutualTls>,
