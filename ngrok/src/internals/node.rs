@@ -2,32 +2,78 @@ use std::sync::Arc;
 
 use napi::bindgen_prelude::*;
 use tokio::sync::Mutex;
-
-use crate::{
-    config::TunnelBuilder,
-    Session,
-    Tunnel,
-    tunnel_ext::TunnelExt, tunnel::TcpTunnel,
+use tracing::debug;
+use tracing_subscriber::{
+    self,
+    fmt::format::FmtSpan,
 };
 
-#[napi]
+use crate::{
+    config::{
+        TcpTunnelBuilder,
+        TunnelBuilder,
+    },
+    session::SessionBuilder,
+    tunnel::TcpTunnel,
+    tunnel_ext::TunnelExt,
+    Session,
+    Tunnel,
+};
+
+#[napi(js_name = "SessionBuilder")]
 #[allow(dead_code)]
-async fn session() -> Result<JsSession> {
-    Session::builder()
-        .authtoken_from_env()
-        .metadata("Online in One Line")
-        .connect()
-        .await
-        .map(|s| JsSession { raw_session: s })
-        .map_err(|e| {
-            Error::new(
-                Status::GenericFailure,
-                format!("failed to read file, {}", e),
-            )
-        })
+pub struct JsSessionBuilder {
+    raw_builder: SessionBuilder,
 }
 
-#[napi(js_name = "Session")]
+#[napi]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::new_without_default))]
+impl JsSessionBuilder {
+    #[napi(constructor)]
+    pub fn new() -> Self {
+        tracing_subscriber::fmt()
+            .pretty()
+            .with_span_events(FmtSpan::ENTER)
+            .with_env_filter(std::env::var("RUST_LOG").unwrap_or_default())
+            .init();
+
+        JsSessionBuilder {
+            raw_builder: Session::builder(),
+        }
+    }
+
+    #[napi]
+    pub fn authtoken_from_env(&mut self) -> &Self {
+        // can't put lifetimes or generics on napi structs, which limits our options.
+        // there is a Reference which can force static lifetime, but haven't figured
+        // out a way to make this actually helpful. so send in the clones.
+        // https://napi.rs/docs/concepts/reference
+        self.raw_builder = self.raw_builder.clone().authtoken_from_env();
+        self
+    }
+
+    #[napi]
+    pub fn metadata(&mut self, metadata: String) -> &Self {
+        self.raw_builder = self.raw_builder.clone().metadata(metadata);
+        self
+    }
+
+    #[napi]
+    pub async fn connect(&self) -> Result<JsSession> {
+        self.raw_builder
+            .connect()
+            .await
+            .map(|s| JsSession { raw_session: s })
+            .map_err(|e| {
+                Error::new(
+                    Status::GenericFailure,
+                    format!("failed to connect session, {e}"),
+                )
+            })
+    }
+}
+
+#[napi(js_name = "Session", custom_finalize)]
 pub struct JsSession {
     #[allow(dead_code)]
     raw_session: Session,
@@ -39,33 +85,75 @@ impl JsSession {
     pub fn unused() -> Result<Self> {
         Err(Error::new(
             Status::GenericFailure,
-            format!("cannot instantiate"),
+            "cannot instantiate".to_string(),
         ))
     }
 
     #[napi]
-    pub async fn hi(&self) -> Result<String> {
-        Ok("hi".to_string())
+    pub fn tcp_endpoint(&self) -> JsTcpEndpoint {
+        JsTcpEndpoint {
+            tcp_endpoint: self.raw_session.tcp_endpoint(),
+        }
+    }
+}
+
+impl ObjectFinalize for JsSession {
+    fn finalize(self, mut _env: Env) -> Result<()> {
+        debug!("JsSession finalize");
+        Ok(())
+    }
+}
+
+#[napi(js_name = "TcpEndpoint", custom_finalize)]
+pub struct JsTcpEndpoint {
+    tcp_endpoint: TcpTunnelBuilder,
+}
+
+#[napi]
+impl JsTcpEndpoint {
+    #[napi(constructor)]
+    pub fn unused() -> Result<Self> {
+        Err(Error::new(
+            Status::GenericFailure,
+            "cannot instantiate".to_string(),
+        ))
     }
 
     #[napi]
-    pub async fn start_tunnel(&self) -> Result<JsTunnel> {
-        self.raw_session
-            .tcp_endpoint()
+    pub fn metadata(&mut self, metadata: String) -> &Self {
+        self.tcp_endpoint = self.tcp_endpoint.clone().metadata(metadata);
+        self
+    }
+
+    #[napi]
+    pub fn remote_addr(&mut self, remote_addr: String) -> &Self {
+        self.tcp_endpoint = self.tcp_endpoint.clone().remote_addr(remote_addr);
+        self
+    }
+
+    #[napi]
+    pub async fn listen(&self) -> Result<JsTunnel> {
+        self.tcp_endpoint
             .listen()
             .await
             .map(JsTunnel::new)
             .map_err(|e| {
                 Error::new(
                     Status::GenericFailure,
-                    format!("failed to start tunnel: {}", e),
+                    format!("failed to start tunnel: {e}"),
                 )
             })
     }
 }
 
+impl ObjectFinalize for JsTcpEndpoint {
+    fn finalize(self, mut _env: Env) -> Result<()> {
+        debug!("JsTcpEndpoint finalize");
+        Ok(())
+    }
+}
 
-#[napi(js_name = "Tunnel")]
+#[napi(js_name = "Tunnel", custom_finalize)]
 pub struct JsTunnel {
     #[allow(dead_code)]
     id: String,
@@ -81,12 +169,11 @@ impl JsTunnel {
     pub fn unused() -> Result<Self> {
         Err(Error::new(
             Status::GenericFailure,
-            format!("cannot instantiate"),
+            "cannot instantiate".to_string(),
         ))
     }
 
-    fn new(raw_tunnel: TcpTunnel) -> Self
-    {
+    fn new(raw_tunnel: TcpTunnel) -> Self {
         JsTunnel {
             id: raw_tunnel.id().to_string(),
             url: raw_tunnel.inner.url().to_string(),
@@ -106,10 +193,18 @@ impl JsTunnel {
 
     #[napi]
     pub async fn forward_http(&self, addr: String) -> Result<()> {
-        self.raw_tunnel.lock().await.forward_http(addr).await
-            .map_err(|e| Error::new(
-                Status::GenericFailure,
-                format!("cannot forward http: {}", e),
-            ))
+        self.raw_tunnel
+            .lock()
+            .await
+            .forward_http(addr)
+            .await
+            .map_err(|e| Error::new(Status::GenericFailure, format!("cannot forward http: {e}")))
+    }
+}
+
+impl ObjectFinalize for JsTunnel {
+    fn finalize(self, mut _env: Env) -> Result<()> {
+        debug!("JsTunnel finalize");
+        Ok(())
     }
 }

@@ -30,10 +30,10 @@ arc-swap = "1.5.1"
 tokio-retry = "0.3.0"
 napi = { version = "2.10.2", default-features = false, features = ["napi4", "tokio_rt"] }
 napi-derive = "2.9.3"
+tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 
 [build-dependencies]
 napi-build = "2.0.1"
-# pyo3-build-config = "0.17.3"
 
 [profile.release]
 lto = true

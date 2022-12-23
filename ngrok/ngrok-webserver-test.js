@@ -1,12 +1,3 @@
-var ngrok = require('.');
-forward_future = ngrok.session().then((session) => {
-  session.startTunnel().then((tunnel) => {
-    console.log("established tunnel at: " + tunnel.getUrl())
-    tunnel.forwardHttp("localhost:8081");
-  })
-})
-console.log("forward_future: " + forward_future)
-
 // Import the Node.js http module
 var http = require('http'); 
   
@@ -30,6 +21,27 @@ res.writeHead(200, {'Content-Type': 'text/html'}); 
     res.end();
   
 }).listen(8081); // Server object listens on port 8081
-  
 console.log('Node.js web server at port 8081 is running..');
-forward_future.await;
+
+// setup ngrok
+var ngrok = require('.');
+builder = new ngrok.SessionBuilder();
+builder.authtokenFromEnv().metadata("this is so fun")
+
+var global_session; // don't let this get garbage collected
+var global_tunnel;
+builder.connect().then((session) => {
+  global_session = session
+  session.tcpEndpoint()
+    .metadata("node tunnel")
+    //.remoteAddr("<n>.tcp.ngrok.io:<ppppp>")
+    .listen().then((tunnel) => {
+      global_tunnel = tunnel;
+      console.log("established tunnel at: " + tunnel.getUrl())
+      tunnel.forwardHttp("localhost:8081");
+  })
+}).await;
+
+setInterval(() => {
+    console.log('async loop still running');
+}, 5000)

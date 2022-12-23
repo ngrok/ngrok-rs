@@ -237,8 +237,9 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { session, Session, Tunnel } = nativeBinding
+const { SessionBuilder, Session, TcpEndpoint, Tunnel } = nativeBinding
 
-module.exports.session = session
+module.exports.SessionBuilder = SessionBuilder
 module.exports.Session = Session
+module.exports.TcpEndpoint = TcpEndpoint
 module.exports.Tunnel = Tunnel
