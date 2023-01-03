@@ -1,3 +1,7 @@
+var UNIX_SOCKET = "/tmp/http.socket";
+const fs = require('fs');
+fs.unlinkSync(UNIX_SOCKET);
+
 // Import the Node.js http module
 var http = require('http'); 
   
@@ -15,13 +19,16 @@ http.createServer(function (req, res) {
 res.writeHead(200, {'Content-Type': 'text/html'}); 
   
     // Write a response to the client
-    res.write('Congrats you have a created a web server');
+    res.write('Congrats you have a created an ngrok web server');
   
     // End the response
     res.end();
   
-}).listen(8081); // Server object listens on port 8081
-console.log('Node.js web server at port 8081 is running..');
+})
+// .listen(8081); // Server object listens on port 8081
+//console.log('Node.js web server at port 8081 is running..');
+.listen(UNIX_SOCKET); // Server object listens on unix socket
+console.log('Node.js web server at ' + UNIX_SOCKET + ' is running..');
 
 // setup ngrok
 var ngrok = require('.');
@@ -38,7 +45,8 @@ builder.connect().then((session) => {
     .listen().then((tunnel) => {
       global_tunnel = tunnel;
       console.log("established tunnel at: " + tunnel.getUrl())
-      tunnel.forwardHttp("localhost:8081");
+      // tunnel.forwardHttp("localhost:8081");
+      tunnel.forwardUnix(UNIX_SOCKET);
   })
 }).await;
 

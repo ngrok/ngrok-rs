@@ -28,4 +28,5 @@ export class Tunnel {
   getId(): string
   getUrl(): string
   forwardHttp(addr: string): Promise<void>
+  forwardUnix(addr: string): Promise<void>
 }

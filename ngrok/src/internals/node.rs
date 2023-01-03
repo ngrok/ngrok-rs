@@ -200,6 +200,16 @@ impl JsTunnel {
             .await
             .map_err(|e| Error::new(Status::GenericFailure, format!("cannot forward http: {e}")))
     }
+
+    #[napi]
+    pub async fn forward_unix(&self, addr: String) -> Result<()> {
+        self.raw_tunnel
+            .lock()
+            .await
+            .forward_unix(addr)
+            .await
+            .map_err(|e| Error::new(Status::GenericFailure, format!("cannot forward unix: {e}")))
+    }
 }
 
 impl ObjectFinalize for JsTunnel {
