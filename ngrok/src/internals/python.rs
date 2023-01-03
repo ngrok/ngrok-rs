@@ -5,6 +5,7 @@ use std::{
 
 use blocking::block_on;
 use bytes::BytesMut;
+use futures::TryStreamExt;
 use pyo3::{
     exceptions::PyValueError,
     pyclass,
@@ -19,7 +20,6 @@ use pyo3::{
     wrap_pyfunction,
     PyAny,
     PyErr,
-    PyObject,
     PyResult,
     Python,
 };
@@ -31,20 +31,15 @@ use tokio::{
         ReadHalf,
         WriteHalf,
     },
-    net::{
-        tcp::{
-            OwnedReadHalf,
-            OwnedWriteHalf,
-        },
-        TcpStream,
-    },
     sync::Mutex,
 };
-use futures::TryStreamExt;
 
 use crate::{
+    config::TunnelBuilder,
+    prelude::TunnelExt,
+    tunnel::TcpTunnel,
     Conn as RawConn,
-    Session as RawSession, tunnel::TcpTunnel, config::TunnelBuilder,
+    Session as RawSession,
 };
 
 #[pyclass]
@@ -109,7 +104,8 @@ async fn internal_start_tunnel(
         }
     }
 
-    config.listen()
+    config
+        .listen()
         .await
         .map(Tunnel::new)
         .map_err(|e| PyValueError::new_err(e.to_string()))
@@ -126,77 +122,14 @@ async fn internal_accept(tunnel: &mut Tunnel) -> Result<Conn, PyErr> {
         .map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
-async fn internal_proxy_pass(tunnel: &mut Tunnel, addr: String) -> Result<(), PyErr> {
-    loop {
-        let res = internal_accept(tunnel).await;
-        if res.is_err() {
-            break;
-        }
-        let conn = res.ok().unwrap();
-        let my_addr = addr.clone();
-        wire_it_tcp(conn, my_addr)
-            .await
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
-    }
-    println!("proxy_pass thread exiting");
-    Ok(())
-}
-
-async fn wire_it_tcp(conn: Conn, addr: String) -> Result<(), PyErr> {
-    TcpStream::connect(addr.clone())
+async fn internal_forward_http(tunnel: &mut Tunnel, addr: String) -> Result<(), PyErr> {
+    tunnel
+        .raw_tunnel
+        .lock()
         .await
-        .map(|stream| {
-            let (rx, tx) = stream.into_split();
-            wire_conn_to_stream(conn.reader, tx);
-            wire_stream_to_conn(rx, conn.writer);
-        })
+        .forward_http(addr)
+        .await
         .map_err(|e| PyValueError::new_err(e.to_string()))
-}
-
-fn wire_conn_to_stream(rx: Arc<Mutex<ReadHalf<RawConn>>>, mut tx: OwnedWriteHalf) {
-    println!("start wire_conn_to_stream");
-    pyo3_asyncio::tokio::get_runtime().spawn(async move {
-        println!("start async wire_conn_to_stream");
-        loop {
-            let mut buf = [0u8; 32];
-            let size = rx.lock().await.read(&mut buf).await.unwrap();
-            if size == 0 {
-                println!("wire_conn_to_stream stream done");
-                break;
-            }
-            println!(
-                "wire_conn_to_stream: {:?}",
-                std::str::from_utf8(&buf[..size]).unwrap()
-            );
-            let res = tx.write_all(&buf[..size]).await;
-            if res.is_err() {
-                print!("wire_conn_to_stream: error: {}", res.err().unwrap());
-                break;
-            }
-        }
-        println!("wire_conn_to_stream: loop done");
-    });
-}
-
-fn wire_stream_to_conn(mut rx: OwnedReadHalf, tx: Arc<Mutex<WriteHalf<RawConn>>>) {
-    println!("start wire_stream_to_conn");
-    pyo3_asyncio::tokio::get_runtime().spawn(async move {
-        println!("start async wire_stream_to_conn");
-        loop {
-            let mut buf = [0u8; 32];
-            let size = rx.read(&mut buf).await.unwrap();
-            if size == 0 {
-                println!("wire_stream_to_conn stream done");
-                break;
-            }
-            let res = tx.lock().await.write_all(&buf[..size]).await;
-            if res.is_err() {
-                print!("wire_conn_to_stream: error: {}", res.err().unwrap());
-                break;
-            }
-        }
-        println!("wire_stream_to_conn: loop done");
-    });
 }
 
 #[pyfunction(py_kwargs = "**")]
@@ -204,32 +137,6 @@ fn wire_stream_to_conn(mut rx: OwnedReadHalf, tx: Arc<Mutex<WriteHalf<RawConn>>>
 fn connect<'a>(py: Python<'a>, py_kwargs: Option<&PyDict>) -> PyResult<&'a PyAny> {
     let map = py_kwargs.map(|k| k.extract().unwrap());
     pyo3_asyncio::tokio::future_into_py(py, async move { internal_connect(map).await })
-}
-
-#[pyfunction(py_kwargs = "**")]
-#[allow(clippy::needless_lifetimes)] // clippy has its limits, these are required
-fn start_tunnel<'a>(
-    py: Python<'a>,
-    session: PyObject,
-    py_kwargs: Option<&PyDict>,
-) -> PyResult<&'a PyAny> {
-    let s: Session = session.extract(py)?;
-    let map = py_kwargs.map(|k| k.extract().unwrap());
-    pyo3_asyncio::tokio::future_into_py(py, async move { internal_start_tunnel(&s, map).await })
-}
-
-#[pyfunction]
-#[allow(clippy::needless_lifetimes)] // clippy has its limits, these are required
-fn accept<'a>(py: Python<'a>, tunnel: PyObject) -> PyResult<&'a PyAny> {
-    let mut t: Tunnel = tunnel.extract(py)?;
-    pyo3_asyncio::tokio::future_into_py(py, async move { internal_accept(&mut t).await })
-}
-
-#[pyfunction]
-#[allow(clippy::needless_lifetimes)] // clippy has its limits, these are required
-fn proxy_pass<'a>(py: Python<'a>, tunnel: PyObject, addr: String) -> PyResult<&'a PyAny> {
-    let mut t: Tunnel = tunnel.extract(py)?;
-    pyo3_asyncio::tokio::future_into_py(py, async move { internal_proxy_pass(&mut t, addr).await })
 }
 
 #[pyclass]
@@ -267,11 +174,11 @@ impl Tunnel {
         block_on(async { internal_accept(self).await })
     }
 
-    pub fn proxy_pass<'a>(&mut self, py: Python<'a>, addr: String) -> PyResult<&'a PyAny> {
-        println!("proxy_pass");
+    pub fn forward_http<'a>(&mut self, py: Python<'a>, addr: String) -> PyResult<&'a PyAny> {
+        println!("forward_http");
         let mut my_tunnel = self.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            internal_proxy_pass(&mut my_tunnel, addr.clone()).await
+            internal_forward_http(&mut my_tunnel, addr.clone()).await
         })
     }
 
@@ -396,9 +303,6 @@ impl Conn {
 #[pymodule]
 fn ngrok(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(connect, m)?)?;
-    m.add_function(wrap_pyfunction!(start_tunnel, m)?)?;
-    m.add_function(wrap_pyfunction!(accept, m)?)?;
-    m.add_function(wrap_pyfunction!(proxy_pass, m)?)?;
     m.add_class::<Tunnel>()?;
     Ok(())
 }

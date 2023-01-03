@@ -19,14 +19,13 @@ async def create_tunnel():
   print("session: {}".format(session))
 
   # create tunnel
-  # f2 = ngrok.start_tunnel(session, metadata="python tun meta", remote_addr="n.tcp.ngrok.io:nnnnn")
+  # f2 = session.start_tunnel(metadata="python tun meta", remote_addr="n.tcp.ngrok.io:nnnnn")
   f2 = session.start_tunnel(metadata="python tun meta")
   await f2
   tunnel = f2.result()
   print("tunnel: {}".format(tunnel))
 
-  # f3 = ngrok.proxy_pass(tunnel, "localhost:9999")
-  f3 = tunnel.proxy_pass("localhost:9999")
+  f3 = tunnel.forward_http("localhost:9999")
   await f3
   res = f3.result()
   print("res: {}".format(res))
@@ -42,7 +41,7 @@ async def python_accept_loop(tunnel):
   # accept loop
   while (True):
     # accept a new connection
-    f3 = ngrok.accept(tunnel)
+    f3 = tunnel.accept()
     await f3
     conn = f3.result()
     print("conn: {}".format(conn))
