@@ -2,3 +2,5 @@
 /Cargo.lock
 .direnv
 *.swp
+.env
+__pycache__

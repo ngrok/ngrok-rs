@@ -6,6 +6,7 @@ mod internals {
     #[macro_use]
     pub mod rpc;
     pub mod proto;
+    pub mod python;
     pub mod raw_session;
 }
 
