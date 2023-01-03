@@ -4,9 +4,13 @@ import asyncio
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import io
 import ngrok
+import os
 import socket
+import socketserver
 import threading
 import time
+
+UNIX_SOCKET = "/tmp/http.socket"
 
 async def create_tunnel():
   # still alive?
@@ -26,6 +30,7 @@ async def create_tunnel():
   print("tunnel: {}".format(tunnel))
 
   f3 = tunnel.forward_http("localhost:9999")
+  # f3 = tunnel.forward_unix(UNIX_SOCKET)
   await f3
   res = f3.result()
   print("res: {}".format(res))
@@ -125,7 +130,20 @@ def start_http_server():
   thread = threading.Thread(target=httpd.serve_forever, daemon=True)
   thread.start()
 
+class UnixSocketHttpServer(socketserver.UnixStreamServer):
+    def get_request(self):
+        request, client_address = super(UnixSocketHttpServer, self).get_request()
+        return (request, ["local", 0])
+
+def start_unix_http_server():
+  if os.path.exists(UNIX_SOCKET):
+    os.remove(UNIX_SOCKET)
+  httpd = UnixSocketHttpServer((UNIX_SOCKET), BaseHTTPRequestHandler)
+  thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+  thread.start()
+
 start_http_server()
+start_unix_http_server()
 loop = asyncio.new_event_loop()
 loop.run_until_complete(create_tunnel())
 loop.close()

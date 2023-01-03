@@ -132,6 +132,16 @@ async fn internal_forward_http(tunnel: &mut Tunnel, addr: String) -> Result<(), 
         .map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
+async fn internal_forward_unix(tunnel: &mut Tunnel, addr: String) -> Result<(), PyErr> {
+    tunnel
+        .raw_tunnel
+        .lock()
+        .await
+        .forward_unix(addr)
+        .await
+        .map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
 #[pyfunction(py_kwargs = "**")]
 #[allow(clippy::needless_lifetimes)] // clippy has its limits, these are required
 fn connect<'a>(py: Python<'a>, py_kwargs: Option<&PyDict>) -> PyResult<&'a PyAny> {
@@ -179,6 +189,14 @@ impl Tunnel {
         let mut my_tunnel = self.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
             internal_forward_http(&mut my_tunnel, addr.clone()).await
+        })
+    }
+
+    pub fn forward_unix<'a>(&mut self, py: Python<'a>, addr: String) -> PyResult<&'a PyAny> {
+        println!("forward_unix");
+        let mut my_tunnel = self.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            internal_forward_unix(&mut my_tunnel, addr.clone()).await
         })
     }
 
