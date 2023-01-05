@@ -31,6 +31,7 @@ async def create_tunnel():
 
   f3 = tunnel.forward_http("localhost:9999")
   # f3 = tunnel.forward_unix(UNIX_SOCKET)
+  # await python_accept_loop(tunnel)
   await f3
   res = f3.result()
   print("res: {}".format(res))
@@ -39,8 +40,6 @@ async def alive():
   while (True):
     await asyncio.sleep(5)
     print("asyncio is alive")
-
-  # await python_accept_loop(tunnel)
 
 async def python_accept_loop(tunnel):
   # accept loop
@@ -58,12 +57,12 @@ async def python_accept_loop(tunnel):
 async def async_wire_to_http(conn):
   # https://docs.python.org/3/library/asyncio-protocol.html#tcp-echo-client
   transport, protocol = await loop.create_connection(
-    lambda: EchoClientProtocol(conn),
+    lambda: ClientProtocol(conn),
     "localhost", 9999)
 
   await wire_conn_reader(conn, transport)
 
-class EchoClientProtocol(asyncio.Protocol):
+class ClientProtocol(asyncio.Protocol):
   def __init__(self, conn):
     self.conn = conn
 
