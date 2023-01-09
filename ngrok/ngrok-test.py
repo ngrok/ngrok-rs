@@ -29,8 +29,8 @@ async def create_tunnel():
   tunnel = f2.result()
   print("tunnel: {}".format(tunnel))
 
-  f3 = tunnel.forward_http("localhost:9999")
-  # f3 = tunnel.forward_unix(UNIX_SOCKET)
+  # f3 = tunnel.forward_tcp("localhost:9999")
+  f3 = tunnel.forward_unix(UNIX_SOCKET)
   # await python_accept_loop(tunnel)
   await f3
   res = f3.result()
@@ -141,7 +141,7 @@ def start_unix_http_server():
   thread = threading.Thread(target=httpd.serve_forever, daemon=True)
   thread.start()
 
-start_http_server()
+# start_http_server()
 start_unix_http_server()
 loop = asyncio.new_event_loop()
 loop.run_until_complete(create_tunnel())

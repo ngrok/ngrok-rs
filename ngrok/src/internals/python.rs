@@ -122,12 +122,12 @@ async fn internal_accept(tunnel: &mut Tunnel) -> Result<Conn, PyErr> {
         .map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
-async fn internal_forward_http(tunnel: &mut Tunnel, addr: String) -> Result<(), PyErr> {
+async fn internal_forward_tcp(tunnel: &mut Tunnel, addr: String) -> Result<(), PyErr> {
     tunnel
         .raw_tunnel
         .lock()
         .await
-        .forward_http(addr)
+        .forward_tcp(addr)
         .await
         .map_err(|e| PyValueError::new_err(e.to_string()))
 }
@@ -184,11 +184,11 @@ impl Tunnel {
         block_on(async { internal_accept(self).await })
     }
 
-    pub fn forward_http<'a>(&mut self, py: Python<'a>, addr: String) -> PyResult<&'a PyAny> {
-        println!("forward_http");
+    pub fn forward_tcp<'a>(&mut self, py: Python<'a>, addr: String) -> PyResult<&'a PyAny> {
+        println!("forward_tcp");
         let mut my_tunnel = self.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            internal_forward_http(&mut my_tunnel, addr.clone()).await
+            internal_forward_tcp(&mut my_tunnel, addr.clone()).await
         })
     }
 
