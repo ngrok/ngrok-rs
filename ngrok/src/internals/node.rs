@@ -192,13 +192,13 @@ impl JsTunnel {
     }
 
     #[napi]
-    pub async fn forward_http(&self, addr: String) -> Result<()> {
+    pub async fn forward_tcp(&self, addr: String) -> Result<()> {
         self.raw_tunnel
             .lock()
             .await
-            .forward_http(addr)
+            .forward_tcp(addr)
             .await
-            .map_err(|e| Error::new(Status::GenericFailure, format!("cannot forward http: {e}")))
+            .map_err(|e| Error::new(Status::GenericFailure, format!("cannot forward tcp: {e}")))
     }
 
     #[napi]

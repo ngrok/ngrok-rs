@@ -29,7 +29,7 @@ builder.connect().then((session) => {
     .listen().then((tunnel) => {
       global_tunnel = tunnel;
       console.log("established tunnel at: " + tunnel.getUrl())
-      // tunnel.forwardHttp("localhost:8081");
+      // tunnel.forwardTcp("localhost:8081");
       tunnel.forwardUnix(UNIX_SOCKET);
   })
 }).await;
