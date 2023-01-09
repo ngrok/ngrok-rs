@@ -67,3 +67,6 @@ pub mod prelude {
         tunnel_ext::TunnelExt,
     };
 }
+
+#[cfg(all(test, feature = "online-tests"))]
+mod online_tests;
