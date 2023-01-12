@@ -13,12 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: cachix/install-nix-action@v18
-      - run: |
-          curl -v --retry 5 --retry-all-errors -sfL https://direnv.net/install.sh \
-            | sed 's/curl/curl -v --retry 5 --retry-all-errors --header "authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"/g' \
-            | bash
-      - run: direnv allow
-      - run: direnv export gha >> "$GITHUB_ENV"
+      - uses: jrobsonchase/direnv-action@v0.6
       - uses: actions-rs/cargo@v1
         with:
           command: udeps
@@ -30,12 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: cachix/install-nix-action@v18
-      - run: |
-          curl -v --retry 5 --retry-all-errors -sfL https://direnv.net/install.sh \
-            | sed 's/curl/curl -v --retry 5 --retry-all-errors --header "authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"/g' \
-            | bash
-      - run: direnv allow
-      - run: direnv export gha >> "$GITHUB_ENV"
+      - uses: jrobsonchase/direnv-action@v0.6
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
@@ -47,12 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: cachix/install-nix-action@v18
-      - run: |
-          curl -v --retry 5 --retry-all-errors -sfL https://direnv.net/install.sh \
-            | sed 's/curl/curl -v --retry 5 --retry-all-errors --header "authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"/g' \
-            | bash
-      - run: direnv allow
-      - run: direnv export gha >> "$GITHUB_ENV"
+      - uses: jrobsonchase/direnv-action@v0.6
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
@@ -64,12 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: cachix/install-nix-action@v18
-      - run: |
-          curl -v --retry 5 --retry-all-errors -sfL https://direnv.net/install.sh \
-            | sed 's/curl/curl -v --retry 5 --retry-all-errors --header "authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"/g' \
-            | bash
-      - run: direnv allow
-      - run: direnv export gha >> "$GITHUB_ENV"
+      - uses: jrobsonchase/direnv-action@v0.6
       - uses: actions-rs/cargo@v1
         env:
           NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
