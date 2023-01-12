@@ -81,6 +81,18 @@
             pre-commit
           ])}
         '';
+        # Make sure that cargo semver-checks uses the stable toolchain rather
+        # than the nightly one that we normally develop with.
+        semver-checks = with pkgs; symlinkJoin {
+          name = "cargo-semver-checks";
+          paths = [ cargo-semver-checks ];
+          buildInputs = [ makeWrapper ];
+          postBuild = ''
+            wrapProgram $out/bin/cargo-semver-checks \
+              --prefix PATH : ${rustc}/bin \
+              --prefix PATH : ${cargo}/bin
+          '';
+        };
       in
       {
         devShell = pkgs.mkShell {
@@ -93,6 +105,7 @@
             fix-n-fmt
             setup-hooks
             cargo-udeps
+            semver-checks
           ] ++ lib.optionals stdenv.isDarwin [ pkgs.darwin.apple_sdk.frameworks.Security ];
         };
       });
