@@ -1,0 +1,20 @@
+on:
+  workflow_dispatch:
+    inputs:
+      crate:
+        description: 'Crate to release'     
+        required: true
+        default: 'ngrok'
+
+jobs:
+  udeps:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v18
+      - uses: jrobsonchase/direnv-action@v0.6
+      - uses: actions-rs/cargo@v1
+        with:
+          command: udeps
+          args: -p ${{ inputs.crate }} --all-features

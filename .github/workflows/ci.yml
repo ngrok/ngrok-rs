@@ -7,18 +7,6 @@ on:
 name: Continuous integration
 
 jobs:
-  udeps:
-    name: Udeps
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v18
-      - uses: jrobsonchase/direnv-action@v0.6
-      - uses: actions-rs/cargo@v1
-        with:
-          command: udeps
-          args: --workspace --all-targets --all-features
-
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
